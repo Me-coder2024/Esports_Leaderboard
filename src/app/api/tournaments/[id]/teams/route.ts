@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { createServerSupabase } from "@/lib/supabase";
 
 // GET /api/tournaments/[id]/teams
 export async function GET(
@@ -8,13 +8,19 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const teams = await prisma.team.findMany({
-      where: { tournamentId: id },
-      orderBy: { teamName: "asc" },
-    });
+    const supabase = createServerSupabase();
+
+    const { data: teams, error } = await supabase
+      .from("teams")
+      .select("*")
+      .eq("tournament_id", id)
+      .order("team_name");
+
+    if (error) throw error;
 
     return NextResponse.json(teams);
-  } catch {
+  } catch (err) {
+    console.error("Failed to fetch teams:", err);
     return NextResponse.json(
       { error: "Failed to fetch teams" },
       { status: 500 }
@@ -29,17 +35,24 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { teamName, teamLeaderName, logoUrl } = await request.json();
+    const { team_name, team_leader_name, logo_url } = await request.json();
 
-    if (!teamName || !teamLeaderName) {
+    if (!team_name || !team_name.trim()) {
       return NextResponse.json(
-        { error: "Team name and leader name are required" },
+        { error: "Team name is required" },
         { status: 400 }
       );
     }
 
+    const supabase = createServerSupabase();
+
     // Check tournament exists and is in SETUP
-    const tournament = await prisma.tournament.findUnique({ where: { id } });
+    const { data: tournament } = await supabase
+      .from("tournaments")
+      .select("status")
+      .eq("id", id)
+      .single();
+
     if (!tournament) {
       return NextResponse.json(
         { error: "Tournament not found" },
@@ -53,17 +66,22 @@ export async function POST(
       );
     }
 
-    const team = await prisma.team.create({
-      data: {
-        tournamentId: id,
-        teamName,
-        teamLeaderName,
-        logoUrl,
-      },
-    });
+    const { data: team, error } = await supabase
+      .from("teams")
+      .insert({
+        tournament_id: id,
+        team_name: team_name.trim(),
+        team_leader_name: team_leader_name?.trim() || "",
+        logo_url,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
 
     return NextResponse.json(team, { status: 201 });
-  } catch {
+  } catch (err) {
+    console.error("Failed to create team:", err);
     return NextResponse.json(
       { error: "Failed to create team" },
       { status: 500 }

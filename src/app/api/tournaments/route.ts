@@ -1,18 +1,36 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { createServerSupabase } from "@/lib/supabase";
 
 // GET /api/tournaments - List all tournaments
 export async function GET() {
   try {
-    const tournaments = await prisma.tournament.findMany({
-      include: {
-        _count: { select: { teams: true, matches: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const supabase = createServerSupabase();
 
-    return NextResponse.json(tournaments);
-  } catch {
+    const { data: tournaments, error } = await supabase
+      .from("tournaments")
+      .select(`
+        *,
+        teams:teams(count),
+        matches:matches(count)
+      `)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    // Transform the count format
+    const result = tournaments.map((t) => ({
+      ...t,
+      _count: {
+        teams: t.teams?.[0]?.count ?? 0,
+        matches: t.matches?.[0]?.count ?? 0,
+      },
+      teams: undefined,
+      matches: undefined,
+    }));
+
+    return NextResponse.json(result);
+  } catch (err) {
+    console.error("Failed to fetch tournaments:", err);
     return NextResponse.json(
       { error: "Failed to fetch tournaments" },
       { status: 500 }
@@ -23,7 +41,7 @@ export async function GET() {
 // POST /api/tournaments - Create a new tournament
 export async function POST(request: Request) {
   try {
-    const { name, game, bannerUrl } = await request.json();
+    const { name, game, banner_url } = await request.json();
 
     if (!name || !game) {
       return NextResponse.json(
@@ -39,12 +57,19 @@ export async function POST(request: Request) {
       );
     }
 
-    const tournament = await prisma.tournament.create({
-      data: { name, game, bannerUrl },
-    });
+    const supabase = createServerSupabase();
+
+    const { data: tournament, error } = await supabase
+      .from("tournaments")
+      .insert({ name, game, banner_url })
+      .select()
+      .single();
+
+    if (error) throw error;
 
     return NextResponse.json(tournament, { status: 201 });
-  } catch {
+  } catch (err) {
+    console.error("Failed to create tournament:", err);
     return NextResponse.json(
       { error: "Failed to create tournament" },
       { status: 500 }
