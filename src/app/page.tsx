@@ -2,6 +2,10 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import TournamentCard from "@/components/TournamentCard";
 
+import { createServerSupabase } from "@/lib/supabase";
+
+export const dynamic = "force-dynamic";
+
 interface Tournament {
   id: string;
   name: string;
@@ -14,17 +18,29 @@ interface Tournament {
 
 async function getTournaments(): Promise<Tournament[]> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-      ? `${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"}`
-      : "http://localhost:3000";
+    const supabase = createServerSupabase();
+    const { data: tournaments, error } = await supabase
+      .from("tournaments")
+      .select(`
+        *,
+        teams:teams(count),
+        matches:matches(count)
+      `)
+      .order("created_at", { ascending: false });
 
-    const res = await fetch(`${baseUrl}/api/tournaments`, {
-      cache: "no-store",
-    });
+    if (error || !tournaments) return [];
 
-    if (!res.ok) return [];
-    return await res.json();
-  } catch {
+    return tournaments.map((t) => ({
+      ...t,
+      _count: {
+        teams: t.teams?.[0]?.count ?? 0,
+        matches: t.matches?.[0]?.count ?? 0,
+      },
+      teams: undefined,
+      matches: undefined,
+    }));
+  } catch (err) {
+    console.error("Error fetching tournaments on home page:", err);
     return [];
   }
 }
