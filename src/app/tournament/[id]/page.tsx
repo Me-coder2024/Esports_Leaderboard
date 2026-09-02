@@ -124,7 +124,7 @@ export default function TournamentPage() {
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
       <Header />
 
-      <main style={{ flex: 1, maxWidth: 1200, margin: "0 auto", width: "100%", padding: "32px 24px" }}>
+      <main style={{ flex: 1, maxWidth: 1400, margin: "0 auto", width: "100%", padding: "24px 20px" }}>
         {/* Tournament Info */}
         <div
           className="animate-fade-in"

@@ -620,10 +620,11 @@ export default function ScoreDashboard() {
       <main
         style={{
           flex: 1,
-          maxWidth: 960,
+          maxWidth: step === 5 ? 1400 : 960,
           margin: "0 auto",
           width: "100%",
-          padding: "32px 24px",
+          padding: "24px 20px",
+          transition: "max-width 0.3s ease",
         }}
       >
         {/* Top bar */}
